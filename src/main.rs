@@ -1,31 +1,24 @@
-use coremidi::{OutputPort, Destination, Destinations, Source, EventList, Endpoint, Sources, EventBuffer, Protocol, Client};
+mod error;
+mod akai_apc_mini_mk2;
+
+use crate::akai_apc_mini_mk2::{PULSING_1_2, NOTE_ON_STATUS, GRID_MASK};
+use crate::error::AppError;
+use coremidi::{
+    OutputPort,
+    Destination,
+    Destinations,
+    Source,
+    EventList,
+    Sources,
+    EventBuffer,
+    Protocol,
+    Client
+};
 use std::sync::Arc;
 use std::result::Result;
-use std::env;
 use std::sync::Mutex;
 use std::thread;
-use std::time::Duration;
 
-const NOTE_ON_STATUS: u32 = 0x20900000;
-const COLOR_INTENSITY: u32 = 0x20960000;
-const LED_10_BRIGHT: u32 = 0x00000000;
-const LED_25_BRIGHT: u32 = 0x00010000;
-const LED_50_BRIGHT: u32 = 0x00020000;
-const LED_65_BRIGHT: u32 = 0x00030000;
-const LED_75_BRIGHT: u32 = 0x00040000;
-const LED_95_BRIGHT: u32 = 0x00050000;
-const LED_100_BRIGHT: u32 = 0x00060000;
-const PULSING_1_16: u32 = 0x00070000;
-const PULSING_1_8: u32 = 0x00080000;
-const PULSING_1_4: u32 = 0x00090000;
-const PULSING_1_2: u32 = 0x000a0000;
-const BLINKING_1_24: u32 = 0x000b0000;
-const BLINKING_1_16: u32 = 0x000c0000;
-const BLINKING_1_8: u32 = 0x000d0000;
-const BLINKING_1_4: u32 = 0x000e0000;
-const BLINKING_1_2: u32 = 0x000f0000;
-const NOTE_OFF_STATUS: u32 = 0x20800000;
-const BAR_BLINK: u32 = 2;
 
 const GRID_OFFSET: u32 = 56;
 const GRID_GREEN: u32 = 1;
@@ -35,18 +28,8 @@ const NOTE_OFF: u32 = 0x2080407f;
 const NOTE_ON_C: u32 = 0x40903c00;
 const MASK_HALF: u32 = 0xffff0000;
 const MASK: u32 = 0xffff0000;
-const GRID_MASK: u32 = 0x0000ff00;
 
 const LIGHT_DIM: u32 = 0x01;
-
-#[derive(Debug)]
-pub enum AppError {
-    DestinationDisplayNameError,
-    SourceDisplayNameError,
-    SourceNotFoundError,
-    SourceListenError(i32),
-    SourceUniqueIdError,
-}
 
 #[derive(Clone)]
 struct GlobalState {
@@ -68,8 +51,6 @@ struct GridState {
     color_picker: u32,
 }
 
-static COLOR_PICKER: u32 = 0;
-
 fn main() -> Result<(), AppError> {
 
     fibble_destinations()?;
@@ -84,12 +65,6 @@ fn main() -> Result<(), AppError> {
     Ok(())
 }
 
-// fn get_display_name(endpoint: &Endpoint) -> String {
-//     endpoint
-//         .display_name()
-//         .unwrap_or_else(|| "[Unknown Display Name]".to_string())
-// }
-
 fn fibble_destinations() -> Result<(), AppError> {
     println!("System destinations:");
     let client = Client::new("Example Client").unwrap();
@@ -102,18 +77,10 @@ fn fibble_destinations() -> Result<(), AppError> {
         }
         for j in 0..127 {
             let payload = NOTE_ON_STATUS | (j << 8) | 0;
-            // println!("[{}] Sending as byte {}...", i, j);
             println!("Example payload: {:08x}", payload);
             let note_on = EventBuffer::new(Protocol::Midi10).with_packet(0, &[payload]);
-
-            // let note_off = EventBuffer::new(Protocol::Midi10).with_packet(0, &[NOTE_OFF]);
             output_port.send(&destination, &note_on).unwrap();
         };
-
-            // thread::sleep(Duration::from_millis(100));
-
-            // output_port.send(&destination, &note_off).unwrap();
-            // thread::sleep(Duration::from_millis(100));
     };
     let source = Sources.into_iter().find(|s| {
         s.display_name().map_or(false, |name| name == "APC mini mk2 Control")
@@ -131,8 +98,6 @@ fn get_destination(name: &str) -> Option<Destination> {
 }
 
 fn show_destinations() -> Result<(), AppError> {
-    let client = Client::new("Example Client").unwrap();
-    let output_port = client.output_port("Example Port").unwrap();
     for (i, destination) in Destinations.into_iter().enumerate() {
         let display_name = destination.display_name().ok_or(AppError::DestinationDisplayNameError)?;
         println!("[{}] {}", i, display_name);
