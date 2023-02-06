@@ -1,0 +1,10 @@
+#+title:     Grinstrument
+#+author:    Logan Barnett-Hoy
+#+email:     logustus@gmail.com
+#+date:      <2023-02-05 Sun>
+#+language:  en
+#+file_tags:
+#+tags:
+
+
+Here be dragons.
