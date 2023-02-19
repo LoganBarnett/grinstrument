@@ -6,4 +6,14 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-coremidi = "^0.7.0"
+coremidi = "0.7.0"
+coremidi-sys = "3.1.0"
+futures = "0.3.26"
+redux-rs = "0.3.3"
+# Look here if we're trying to get size down. Unsure what features we'll need
+# currently. I just want it to work.
+tokio = { version = "1.25.0", features = ["full"] }
+
+[dependencies.async-std]
+version = "1.6"
+features = ["attributes"]
