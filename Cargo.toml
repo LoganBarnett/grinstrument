@@ -6,13 +6,20 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# Handle the MIDI interface for us. Works on macOS.
 coremidi = "0.7.0"
 coremidi-sys = "3.1.0"
 futures = "0.3.26"
+# Give us reducers for state management.
 redux-rs = "0.3.3"
+# Give us a concurrency model. Needed for handling events.
+#
 # Look here if we're trying to get size down. Unsure what features we'll need
 # currently. I just want it to work.
 tokio = { version = "1.25.0", features = ["full"] }
+# Allow us to sort a list in a call chain.
+itertools = "0.10.5"
+lazy_static = "1.4.0"
 
 [dependencies.async-std]
 version = "1.6"

@@ -1,7 +1,7 @@
 use crate::error::AppError;
 use coremidi::{
-    Client, Destination, Destinations, EventList,
-    InputPortWithContext, OutputPort, Protocol, Source, Sources,
+    Client, Destination, Destinations, EventList, InputPortWithContext,
+    OutputPort, Protocol, Source, Sources,
 };
 
 macro_rules! endpoint_names {
@@ -70,10 +70,8 @@ pub fn get_destination(name: &str) -> Option<Destination> {
 }
 
 pub fn get_source(name: &str) -> Option<Source> {
-    Sources
-        .into_iter()
-        .find(|x| match x.display_name() {
-            Some(display_name) => display_name == name,
-            None => false,
-        })
+    Sources.into_iter().find(|x| match x.display_name() {
+        Some(display_name) => display_name == name,
+        None => false,
+    })
 }

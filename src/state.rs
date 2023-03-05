@@ -52,29 +52,49 @@ pub struct GlobalState {
 
 pub fn initial_state() -> GlobalState {
     GlobalState {
-        sections: vec!(
-            Section {
-                layers: vec!(
-                    Layer {
-                        notes: [
-                            Note { octaves: vec!(), length: 0 },
-                            Note { octaves: vec!(), length: 0 },
-                            Note { octaves: vec!(), length: 0 },
-                            Note { octaves: vec!(), length: 0 },
-                            Note { octaves: vec!(), length: 0 },
-                            Note { octaves: vec!(), length: 0 },
-                            Note { octaves: vec!(), length: 0 },
-                            Note { octaves: vec!(), length: 0 },
-                        ],
-                        instrument: "Beep Boops".to_string(),
-                    }
-                ),
-            }
-        ),
+        sections: vec![Section {
+            layers: vec![Layer {
+                notes: [
+                    Note {
+                        octaves: vec![],
+                        length: 0,
+                    },
+                    Note {
+                        octaves: vec![],
+                        length: 0,
+                    },
+                    Note {
+                        octaves: vec![],
+                        length: 0,
+                    },
+                    Note {
+                        octaves: vec![],
+                        length: 0,
+                    },
+                    Note {
+                        octaves: vec![],
+                        length: 0,
+                    },
+                    Note {
+                        octaves: vec![],
+                        length: 0,
+                    },
+                    Note {
+                        octaves: vec![],
+                        length: 0,
+                    },
+                    Note {
+                        octaves: vec![],
+                        length: 0,
+                    },
+                ],
+                instrument: "Beep Boops".to_string(),
+            }],
+        }],
         player: Player {
             play_mode: PlayMode::Paused,
             active_layer_index: 0,
             active_section: 0,
-        }
+        },
     }
 }

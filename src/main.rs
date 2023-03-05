@@ -1,29 +1,39 @@
+mod action;
 mod akai_apc_mini_mk2;
+mod device;
 mod error;
 mod midi;
-mod utils;
 mod reducer;
-mod action;
 mod state;
-mod device;
+mod utils;
 
-use crate::akai_apc_mini_mk2::{NOTE_ON_STATUS, PULSING_1_2, LED_100_BRIGHT};
-use crate::error::AppError;
-use crate::midi::diagnose_midi_devices;
-use crate::state::initial_state;
-use akai_apc_mini_mk2::AkaiApcMiniMk2;
+use crate::{
+    akai_apc_mini_mk2::{
+        AkaiApcMiniMk2,
+        LED_100_BRIGHT,
+        NOTE_ON_STATUS,
+        PULSING_1_2,
+    },
+    device::Color,
+    device::ColorStyle,
+    error::AppError,
+    midi::diagnose_midi_devices,
+    state::initial_state,
+};
 use coremidi::{
     Client, Destination, Destinations, EventBuffer, EventList, OutputPort,
     Protocol, Source,
 };
 use device::Device;
+use futures::executor::block_on;
 use midi::{connect_to_controller, get_destination, get_source};
 use redux_rs::Store;
 use state::{GlobalState, Note};
 use std::result::Result;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use futures::executor::block_on;
+
+include!(concat!(env!("OUT_DIR"), "/constants.rs"));
 
 const GRID_OFFSET: u32 = 56;
 const GRID_GREEN: u32 = 1;
@@ -39,25 +49,27 @@ const LIGHT_DIM: u32 = 0x01;
 #[tokio::main]
 async fn main() -> Result<(), AppError> {
     diagnose_midi_devices();
-    let store_mutex = Arc::new(Mutex::new(
-        Store::new_with_state(reducer::reducer, initial_state()),
-    ));
+    let store_mutex = Arc::new(Mutex::new(Store::new_with_state(
+        reducer::reducer,
+        initial_state(),
+    )));
     let device = AkaiApcMiniMk2 {};
     let callback = enclose!(
-        (store_mutex) move |event_list: &EventList, mut_context: &mut u32| {
-            println!("Got midi event");
-            let context = mut_context.clone();
-            if let Ok(store) = store_mutex.lock() {
-                for (_size, event_packet) in event_list.iter().enumerate() {
-                    for data in event_packet.data() {
-                        block_on(store.dispatch(
-                            device.midi_to_action(context, *data)
-                        ))
-                    }
+    (store_mutex) move |event_list: &EventList, mut_context: &mut u32| {
+        println!("Got midi event");
+        let context = mut_context.clone();
+        if let Ok(store) = store_mutex.lock() {
+            for (_size, event_packet) in event_list.iter().enumerate() {
+                for data in event_packet.data() {
+                    block_on(store.dispatch(
+                        device.midi_to_action(context, *data)
+                    ))
                 }
             }
-        });
-    let (client, mut input_port, output_port) = connect_to_controller(callback)?;
+        }
+    });
+    let (client, mut input_port, output_port) =
+        connect_to_controller(callback)?;
     let dest = get_destination("APC mini mk2 Control")
         .ok_or(AppError::DestinationNotFoundError)?;
     let source = get_source("APC mini mk2 Control")
@@ -71,20 +83,34 @@ async fn main() -> Result<(), AppError> {
         .map_err(AppError::SourceListenError)?;
     if let Ok(store) = store_mutex.lock() {
         println!("Subscribing...");
-        store.subscribe(move |state: &GlobalState| {
-            println!("State has changed...");
-            for (i, note) in state.sections[0].layers[0].notes.iter().enumerate() {
-                for j in 0..8 {
-                    grid_button_color_to_midi(
-                        &output_port,
-                        &dest,
-                        i as u32,
-                        j as u32,
-                        note_color(&note, j),
-                    );
+        store
+            .subscribe(move |state: &GlobalState| {
+                println!("State has changed...");
+                for (i, note) in
+                    state.sections[0].layers[0].notes.iter().enumerate()
+                {
+                    for j in 0..8 {
+                        device.set_grid_button(
+                            &output_port,
+                            &dest,
+                            i,
+                            j,
+                            Color {
+                                rgb: note_color(&note, j),
+                                style: ColorStyle::Steady,
+                            },
+                        );
+                        // grid_button_color_to_midi(
+                        //     &output_port,
+                        //     &dest,
+                        //     i as u32,
+                        //     j as u32,
+                        //     note_color(&note, j),
+                        // );
+                    }
                 }
-            }
-        }).await;
+            })
+            .await;
     }
     println!("Everything started up, waiting for input!");
     thread::park();
@@ -92,7 +118,11 @@ async fn main() -> Result<(), AppError> {
 }
 
 fn note_color(note: &Note, index: usize) -> u32 {
-    if note.length > 0 && note.octaves.contains(&index) { 9 } else { 0 }
+    if note.length > 0 && note.octaves.contains(&index) {
+        0xff0000
+    } else {
+        0
+    }
 }
 
 fn show_destinations() -> Result<(), AppError> {
