@@ -100,13 +100,6 @@ async fn main() -> Result<(), AppError> {
                                 style: ColorStyle::Steady,
                             },
                         );
-                        // grid_button_color_to_midi(
-                        //     &output_port,
-                        //     &dest,
-                        //     i as u32,
-                        //     j as u32,
-                        //     note_color(&note, j),
-                        // );
                     }
                 }
             })
@@ -119,7 +112,8 @@ async fn main() -> Result<(), AppError> {
 
 fn note_color(note: &Note, index: usize) -> u32 {
     if note.length > 0 && note.octaves.contains(&index) {
-        0xff0000
+        // Red for now.
+        0xff0001
     } else {
         0
     }
@@ -157,19 +151,6 @@ fn bottom_row_to_midi(button_bits: u32) {
         }
         None => (),
     }
-}
-
-fn grid_button_color_to_midi(
-    port: &OutputPort,
-    dest: &Destination,
-    x: u32,
-    y: u32,
-    color: u32,
-) {
-    let payload = NOTE_ON_STATUS | LED_100_BRIGHT | (x + (y * 8)) << 8 | color;
-    println!("Sending color to {}, {}: {:08x}", x, y, payload);
-    let note_on = EventBuffer::new(Protocol::Midi10).with_packet(0, &[payload]);
-    port.send(&dest, &note_on).unwrap();
 }
 
 fn receive_source(source: &Source) {
