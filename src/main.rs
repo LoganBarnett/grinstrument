@@ -9,10 +9,7 @@ mod utils;
 
 use crate::{
     akai_apc_mini_mk2::{
-        AkaiApcMiniMk2,
-        LED_100_BRIGHT,
-        NOTE_ON_STATUS,
-        PULSING_1_2,
+        AkaiApcMiniMk2, LED_100_BRIGHT, NOTE_ON_STATUS, PULSING_1_2,
     },
     device::Color,
     device::ColorStyle,
@@ -86,20 +83,22 @@ async fn main() -> Result<(), AppError> {
         store
             .subscribe(move |state: &GlobalState| {
                 println!("State has changed...");
-                for (i, note) in
-                    state.sections[0].layers[0].notes.iter().enumerate()
+                for (layer_index, layer) in
+                    state.sections[0].layers.iter().enumerate()
                 {
-                    for j in 0..8 {
-                        device.set_grid_button(
-                            &output_port,
-                            &dest,
-                            i,
-                            j,
-                            Color {
-                                rgb: note_color(&note, j),
-                                style: ColorStyle::Steady,
-                            },
-                        );
+                    for (note_index, note) in layer.notes.iter().enumerate() {
+                        for j in 0..8 {
+                            device.set_grid_button(
+                                &output_port,
+                                &dest,
+                                note_index,
+                                j,
+                                Color {
+                                    rgb: note_color(layer_index, &note, j),
+                                    style: ColorStyle::Steady,
+                                },
+                            );
+                        }
                     }
                 }
             })
@@ -110,10 +109,13 @@ async fn main() -> Result<(), AppError> {
     Ok(())
 }
 
-fn note_color(note: &Note, index: usize) -> u32 {
+// Order dictates the layer.
+const LAYER_COLORS: &[u32] =
+    &[0x0000ff, 0x00ffff, 0x00ff00, 0xffff00, 0xff0000, 0xff00ff];
+
+fn note_color(layer: usize, note: &Note, index: usize) -> u32 {
     if note.length > 0 && note.octaves.contains(&index) {
-        // Red for now.
-        0xff0001
+        LAYER_COLORS[layer]
     } else {
         0
     }

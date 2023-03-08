@@ -1,7 +1,7 @@
 use coremidi::{Destination, EventBuffer, OutputPort, Protocol};
 use itertools::Itertools;
-use std::collections::HashMap;
 use lazy_static::lazy_static;
+use std::collections::HashMap;
 
 use crate::{
     action::Action,
@@ -169,27 +169,37 @@ lazy_static! {
 #[derive(Clone, Copy)]
 pub struct AkaiApcMiniMk2 {}
 
-fn color_square(rgb: u32) -> u32 {
+fn color_square(rgb: u32) -> (u32, u32, u32) {
     let r = (0xff0000 & rgb) >> 16;
     let g = (0x00ff00 & rgb) >> 8;
     let b = 0x0000ff & rgb;
-    r.pow(2) + g.pow(2) + b.pow(2)
+    (r.pow(2), g.pow(2), b.pow(2))
 }
 
-fn color_square_tuple(rgb: u32) -> (u32, u32) {
+fn color_square_tuple(rgb: u32) -> (u32, (u32, u32, u32)) {
     (rgb, color_square(rgb))
+}
+
+fn color_distance(
+    (ra, ga, ba): (u32, u32, u32),
+    (rb, gb, bb): (u32, u32, u32),
+) -> u32 {
+    ((ra as i64 - rb as i64).abs()
+        + (ga as i64 - gb as i64).abs()
+        + (ba as i64 - bb as i64).abs()) as u32
 }
 
 fn nearest_color(rgb: u32) -> u32 {
     // A cheap shortcut. May not need it.
     if rgb == 0 {
-        return 0
+        return 0;
     }
     let squared = color_square(rgb);
     AKAI_APC_MINI_MK_2_COLORS_SQUARED
         .to_vec()
         .into_iter()
-        .sorted_by_key(|(_, square)| (squared as i64 - *square as i64).abs() as u32)
+        .map(|(x, fixed)| (x, color_distance(squared, fixed)))
+        .sorted_by_key(|(_, fixed)| fixed.clone())
         .collect::<Vec<(u32, u32)>>()
         .get(0)
         .map(|(original, square)| *original)
@@ -234,6 +244,7 @@ impl Device for AkaiApcMiniMk2 {
         color: Color,
     ) -> Result<(), AppError> {
         let nearest = nearest_color(color.rgb);
+        println!("Color nearest to {:08x}: {:08x}", color.rgb, nearest);
         let payload = NOTE_ON_STATUS
             | LED_100_BRIGHT
             | (x as u32 + (y as u32 * 8)) << 8
