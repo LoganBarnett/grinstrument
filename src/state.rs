@@ -8,7 +8,7 @@ pub enum PlayMode {
     Stopped,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Note {
     pub octaves: Vec<usize>,
     pub length: usize,
@@ -32,7 +32,7 @@ pub struct Layer {
 pub struct Player {
     pub play_mode: PlayMode,
     pub active_layer_index: usize,
-    pub active_section: usize,
+    pub active_section_index: usize,
 }
 
 /**
@@ -52,49 +52,33 @@ pub struct GlobalState {
 
 pub fn initial_state() -> GlobalState {
     GlobalState {
-        sections: vec![Section {
-            layers: vec![Layer {
-                notes: [
-                    Note {
-                        octaves: vec![],
-                        length: 0,
-                    },
-                    Note {
-                        octaves: vec![],
-                        length: 0,
-                    },
-                    Note {
-                        octaves: vec![],
-                        length: 0,
-                    },
-                    Note {
-                        octaves: vec![],
-                        length: 0,
-                    },
-                    Note {
-                        octaves: vec![],
-                        length: 0,
-                    },
-                    Note {
-                        octaves: vec![],
-                        length: 0,
-                    },
-                    Note {
-                        octaves: vec![],
-                        length: 0,
-                    },
-                    Note {
-                        octaves: vec![],
-                        length: 0,
-                    },
-                ],
-                instrument: "Beep Boops".to_string(),
-            }],
-        }],
+        sections: (0..8)
+            .map(|_| {
+                Section {
+                    layers: (0..8)
+                        .map(|_| {
+                            Layer {
+                                instrument: "Beep Boops".to_string(),
+                                notes: (0..8)
+                                    .map(|_| {
+                                        Note {
+                                            octaves: vec![],
+                                            length: 0,
+                                        }
+                                    })
+                                    .collect::<Vec<Note>>()
+                                    .try_into()
+                                    .unwrap()
+                            }
+                        })
+                        .collect::<Vec<Layer>>(),
+                }
+            })
+            .collect::<Vec<Section>>(),
         player: Player {
             play_mode: PlayMode::Paused,
             active_layer_index: 0,
-            active_section: 0,
+            active_section_index: 0,
         },
     }
 }

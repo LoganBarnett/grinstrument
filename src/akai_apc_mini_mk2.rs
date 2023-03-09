@@ -10,6 +10,9 @@ use crate::{
     error::AppError,
 };
 
+// Weird because scene launch offset should be 0x7000 but it makes the math
+// weird since it's just an offset and we need to shift the whole number.
+pub const SCENE_LAUNCH_OFFSET: u32 = 0x00000070;
 pub const NOTE_ON_STATUS: u32 = 0x20900000;
 pub const COLOR_INTENSITY: u32 = 0x20960000;
 pub const LED_10_BRIGHT: u32 = 0x00000000;
@@ -222,6 +225,10 @@ impl Device for AkaiApcMiniMk2 {
                 let bottom_button = (grid - 4) % 8;
                 println!("Bottom button: {}", bottom_button);
                 Action::BottomToggle { pos: bottom_button }
+            } else if grid >= 0x70 {
+                let scene_launch_button = grid - 0x70;
+                // println!("Scene launch button: {}", scene_launch_button);
+                Action::LayerSelect { pos: scene_launch_button }
             } else {
                 println!("Unsupported message {:08x}", command);
                 Action::Noop
@@ -244,7 +251,7 @@ impl Device for AkaiApcMiniMk2 {
         color: Color,
     ) -> Result<(), AppError> {
         let nearest = nearest_color(color.rgb);
-        println!("Color nearest to {:08x}: {:08x}", color.rgb, nearest);
+        // println!("Color nearest to {:08x}: {:08x}", color.rgb, nearest);
         let payload = NOTE_ON_STATUS
             | LED_100_BRIGHT
             | (x as u32 + (y as u32 * 8)) << 8
@@ -253,6 +260,25 @@ impl Device for AkaiApcMiniMk2 {
             EventBuffer::new(Protocol::Midi10).with_packet(0, &[payload]);
         output_port
             .send(&dest, &note_on)
+            .map_err(AppError::OutputSendError)
+    }
+
+    fn set_layer_button(
+        &self,
+        output_port: &OutputPort,
+        dest: &Destination,
+        layer_index: usize,
+        color: Color,
+    ) -> Result<(), AppError> {
+        let send_status = if color.rgb != 0 { NOTE_ON_STATUS } else { NOTE_OFF_STATUS };
+        let payload = NOTE_ON_STATUS
+            | (SCENE_LAUNCH_OFFSET + layer_index as u32) << 8
+            | color.rgb;
+        // println!("Setting Layer button {} to color {:08x} as payload {:08x}", layer_index, color.rgb, payload);
+        let event =
+            EventBuffer::new(Protocol::Midi10).with_packet(0, &[payload]);
+        output_port
+            .send(&dest, &event)
             .map_err(AppError::OutputSendError)
     }
 }

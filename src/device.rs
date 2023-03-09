@@ -30,4 +30,11 @@ pub trait Device {
         y: usize,
         color: Color,
     ) -> Result<(), AppError>;
+    fn set_layer_button(
+        &self,
+        output_port: &OutputPort,
+        dest: &Destination,
+        layer: usize,
+        color: Color,
+    ) -> Result<(), AppError>;
 }

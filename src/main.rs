@@ -83,23 +83,38 @@ async fn main() -> Result<(), AppError> {
         store
             .subscribe(move |state: &GlobalState| {
                 println!("State has changed...");
-                for (layer_index, layer) in
-                    state.sections[0].layers.iter().enumerate()
-                {
-                    for (note_index, note) in layer.notes.iter().enumerate() {
-                        for j in 0..8 {
-                            device.set_grid_button(
+                for (section_index, section) in state.sections.iter().enumerate() {
+                        if section_index == state.player.active_section_index {
+                            for (layer_index, layer) in
+                                section.layers.iter().enumerate()
+                            {
+                            device.set_layer_button(
                                 &output_port,
                                 &dest,
-                                note_index,
-                                j,
+                                layer_index,
                                 Color {
-                                    rgb: note_color(layer_index, &note, j),
                                     style: ColorStyle::Steady,
+                                    rgb: layer_color(layer_index, state.player.active_layer_index),
                                 },
                             );
+                                if layer_index == state.player.active_layer_index {
+                                    for (note_index, note) in layer.notes.iter().enumerate() {
+                                        for j in 0..8 {
+                                            device.set_grid_button(
+                                                &output_port,
+                                                &dest,
+                                                note_index,
+                                                j,
+                                                Color {
+                                                    rgb: note_color(layer_index, &note, j),
+                                                    style: ColorStyle::Steady,
+                                                },
+                                            );
+                                        }
+                                    }
+                                }
+                            }
                         }
-                    }
                 }
             })
             .await;
@@ -111,7 +126,15 @@ async fn main() -> Result<(), AppError> {
 
 // Order dictates the layer.
 const LAYER_COLORS: &[u32] =
-    &[0x0000ff, 0x00ffff, 0x00ff00, 0xffff00, 0xff0000, 0xff00ff];
+    &[0x0000ff, 0x00ffff, 0x00ff00, 0xffff00, 0xff0000, 0xff00ff, 0xffaa00, 0xffffff];
+
+fn layer_color(layer: usize, active_layer: usize) -> u32 {
+    if layer == active_layer {
+        1
+    } else {
+        0
+    }
+}
 
 fn note_color(layer: usize, note: &Note, index: usize) -> u32 {
     if note.length > 0 && note.octaves.contains(&index) {
