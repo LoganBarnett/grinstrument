@@ -4,7 +4,11 @@ use crate::state::{GlobalState, Note};
 pub fn reducer(state: GlobalState, action: Action) -> GlobalState {
     match action {
         Action::Noop => state,
-        Action::BottomToggle { pos } => state,
+        Action::SectionSelect { pos } => {
+            let mut new_state = state.clone();
+            new_state.player.active_section_index = pos as usize;
+            new_state
+        },
         Action::LayerSelect { pos } => {
             let mut new_state = state.clone();
             new_state.player.active_layer_index = pos as usize;
@@ -14,7 +18,7 @@ pub fn reducer(state: GlobalState, action: Action) -> GlobalState {
             let mut new_state = state.clone();
             let layer_opt = new_state
                 .sections
-                .get_mut(0)
+                .get_mut(state.player.active_section_index)
                 .and_then(|section| section.layers.get_mut(state.player.active_layer_index));
             match layer_opt {
                 Some(layer) => {

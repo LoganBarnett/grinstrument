@@ -84,6 +84,15 @@ async fn main() -> Result<(), AppError> {
             .subscribe(move |state: &GlobalState| {
                 println!("State has changed...");
                 for (section_index, section) in state.sections.iter().enumerate() {
+                    device.set_section_button(
+                        &output_port,
+                        &dest,
+                        state.player.active_section_index,
+                        Color {
+                            style: ColorStyle::Steady,
+                            rgb: active_color(section_index, state.player.active_section_index),
+                        },
+                    );
                         if section_index == state.player.active_section_index {
                             for (layer_index, layer) in
                                 section.layers.iter().enumerate()
@@ -94,7 +103,7 @@ async fn main() -> Result<(), AppError> {
                                 layer_index,
                                 Color {
                                     style: ColorStyle::Steady,
-                                    rgb: layer_color(layer_index, state.player.active_layer_index),
+                                    rgb: active_color(layer_index, state.player.active_layer_index),
                                 },
                             );
                                 if layer_index == state.player.active_layer_index {
@@ -128,8 +137,8 @@ async fn main() -> Result<(), AppError> {
 const LAYER_COLORS: &[u32] =
     &[0x0000ff, 0x00ffff, 0x00ff00, 0xffff00, 0xff0000, 0xff00ff, 0xffaa00, 0xffffff];
 
-fn layer_color(layer: usize, active_layer: usize) -> u32 {
-    if layer == active_layer {
+fn active_color(current: usize, active: usize) -> u32 {
+    if current == active {
         1
     } else {
         0

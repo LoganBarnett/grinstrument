@@ -13,6 +13,7 @@ use crate::{
 // Weird because scene launch offset should be 0x7000 but it makes the math
 // weird since it's just an offset and we need to shift the whole number.
 pub const SCENE_LAUNCH_OFFSET: u32 = 0x00000070;
+pub const TRACK_OFFSET: u32 = 0x00000064;
 pub const NOTE_ON_STATUS: u32 = 0x20900000;
 pub const COLOR_INTENSITY: u32 = 0x20960000;
 pub const LED_10_BRIGHT: u32 = 0x00000000;
@@ -205,7 +206,9 @@ fn nearest_color(rgb: u32) -> u32 {
         .sorted_by_key(|(_, fixed)| fixed.clone())
         .collect::<Vec<(u32, u32)>>()
         .get(0)
-        .map(|(original, square)| *original)
+        .map(|(original, _square)| *original)
+    // We should always get one because we know the list is populated. Therefore
+    // this unwrap should always be safe.
         .unwrap_or(0)
 }
 
@@ -221,10 +224,10 @@ impl Device for AkaiApcMiniMk2 {
                 let y = grid / 8;
                 println!("Coords: {} {}", x, y);
                 Action::GridToggle { x, y }
-            } else if grid >= 64 && grid <= 0x6b {
-                let bottom_button = (grid - 4) % 8;
+            } else if grid >= 0x64 && grid <= 0x6b {
+                let bottom_button = grid - 0x64;
                 println!("Bottom button: {}", bottom_button);
-                Action::BottomToggle { pos: bottom_button }
+                Action::SectionSelect { pos: bottom_button }
             } else if grid >= 0x70 {
                 let scene_launch_button = grid - 0x70;
                 // println!("Scene launch button: {}", scene_launch_button);
@@ -270,9 +273,28 @@ impl Device for AkaiApcMiniMk2 {
         layer_index: usize,
         color: Color,
     ) -> Result<(), AppError> {
-        let send_status = if color.rgb != 0 { NOTE_ON_STATUS } else { NOTE_OFF_STATUS };
+        // Always use NoteOn even though we turn off buttons this way.
         let payload = NOTE_ON_STATUS
             | (SCENE_LAUNCH_OFFSET + layer_index as u32) << 8
+            | color.rgb;
+        // println!("Setting Layer button {} to color {:08x} as payload {:08x}", layer_index, color.rgb, payload);
+        let event =
+            EventBuffer::new(Protocol::Midi10).with_packet(0, &[payload]);
+        output_port
+            .send(&dest, &event)
+            .map_err(AppError::OutputSendError)
+    }
+
+    fn set_section_button(
+        &self,
+        output_port: &OutputPort,
+        dest: &Destination,
+        section_index: usize,
+        color: Color,
+    ) -> Result<(), AppError> {
+        // Always use NoteOn even though we turn off buttons this way.
+        let payload = NOTE_ON_STATUS
+            | (TRACK_OFFSET + section_index as u32) << 8
             | color.rgb;
         // println!("Setting Layer button {} to color {:08x} as payload {:08x}", layer_index, color.rgb, payload);
         let event =
