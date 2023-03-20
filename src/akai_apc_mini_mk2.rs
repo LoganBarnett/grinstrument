@@ -10,6 +10,16 @@ use crate::{
     error::AppError,
 };
 
+// Leftovers. I need to go through to see if these are still useful.
+const GRID_OFFSET: u32 = 56;
+const GRID_GREEN: u32 = 1;
+const NOTE_ON: u32 = 0x2090407f;
+const NOTE_OFF: u32 = 0x2080407f;
+const NOTE_ON_C: u32 = 0x40903c00;
+const MASK_HALF: u32 = 0xffff0000;
+const MASK: u32 = 0xffff0000;
+const LIGHT_DIM: u32 = 0x01;
+
 // Weird because scene launch offset should be 0x7000 but it makes the math
 // weird since it's just an offset and we need to shift the whole number.
 pub const SCENE_LAUNCH_OFFSET: u32 = 0x00000070;
@@ -207,8 +217,8 @@ fn nearest_color(rgb: u32) -> u32 {
         .collect::<Vec<(u32, u32)>>()
         .get(0)
         .map(|(original, _square)| *original)
-    // We should always get one because we know the list is populated. Therefore
-    // this unwrap should always be safe.
+        // We should always get one because we know the list is populated. Therefore
+        // this unwrap should always be safe.
         .unwrap_or(0)
 }
 
@@ -224,14 +234,16 @@ impl Device for AkaiApcMiniMk2 {
                 let y = grid / 8;
                 println!("Coords: {} {}", x, y);
                 Action::GridToggle { x, y }
-            } else if grid >= 0x64 && grid <= 0x6b {
-                let bottom_button = grid - 0x64;
+            } else if grid >= TRACK_OFFSET && grid <= 0x6b {
+                let bottom_button = grid - TRACK_OFFSET;
                 println!("Bottom button: {}", bottom_button);
                 Action::SectionSelect { pos: bottom_button }
-            } else if grid >= 0x70 {
-                let scene_launch_button = grid - 0x70;
+            } else if grid >= SCENE_LAUNCH_OFFSET {
+                let scene_launch_button = grid - SCENE_LAUNCH_OFFSET;
                 // println!("Scene launch button: {}", scene_launch_button);
-                Action::LayerSelect { pos: scene_launch_button }
+                Action::LayerSelect {
+                    pos: scene_launch_button,
+                }
             } else {
                 println!("Unsupported message {:08x}", command);
                 Action::Noop
@@ -296,7 +308,7 @@ impl Device for AkaiApcMiniMk2 {
         let payload = NOTE_ON_STATUS
             | (TRACK_OFFSET + section_index as u32) << 8
             | color.rgb;
-        // println!("Setting Layer button {} to color {:08x} as payload {:08x}", layer_index, color.rgb, payload);
+        // println!("Setting section button {} to color {:08x} as payload {:08x}", section_index, color.rgb, payload);
         let event =
             EventBuffer::new(Protocol::Midi10).with_packet(0, &[payload]);
         output_port

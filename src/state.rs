@@ -53,26 +53,20 @@ pub struct GlobalState {
 pub fn initial_state() -> GlobalState {
     GlobalState {
         sections: (0..8)
-            .map(|_| {
-                Section {
-                    layers: (0..8)
-                        .map(|_| {
-                            Layer {
-                                instrument: "Beep Boops".to_string(),
-                                notes: (0..8)
-                                    .map(|_| {
-                                        Note {
-                                            octaves: vec![],
-                                            length: 0,
-                                        }
-                                    })
-                                    .collect::<Vec<Note>>()
-                                    .try_into()
-                                    .unwrap()
-                            }
-                        })
-                        .collect::<Vec<Layer>>(),
-                }
+            .map(|_| Section {
+                layers: (0..8)
+                    .map(|_| Layer {
+                        instrument: "Beep Boops".to_string(),
+                        notes: (0..8)
+                            .map(|_| Note {
+                                octaves: vec![],
+                                length: 0,
+                            })
+                            .collect::<Vec<Note>>()
+                            .try_into()
+                            .unwrap(),
+                    })
+                    .collect::<Vec<Layer>>(),
             })
             .collect::<Vec<Section>>(),
         player: Player {
