@@ -2,8 +2,15 @@ use coremidi::{Destination, OutputPort};
 
 use crate::{action::Action, error::AppError};
 
+// TODO: This should be part of the concrete device.
 pub enum ColorStyle {
-    Steady,
+    Steady100,
+    Steady95,
+    Steady75,
+    Steady65,
+    Steady50,
+    Steady25,
+    Steady10,
     Pulse2,
     Pulse4,
     Pulse8,
@@ -32,11 +39,27 @@ pub trait Device {
         color: Color,
     ) -> Result<(), AppError>;
 
+    fn set_interval(
+        &self,
+        output_port: &OutputPort,
+        dest: &Destination,
+        x: usize,
+        y: usize,
+        color: Color,
+    ) -> Result<(), AppError>;
+
     fn set_layer_button(
         &self,
         output_port: &OutputPort,
         dest: &Destination,
         layer: usize,
+        color: Color,
+    ) -> Result<(), AppError>;
+
+    fn set_play_button(
+        &self,
+        output_port: &OutputPort,
+        dest: &Destination,
         color: Color,
     ) -> Result<(), AppError>;
 
@@ -47,4 +70,5 @@ pub trait Device {
         section_index: usize,
         color: Color,
     ) -> Result<(), AppError>;
+
 }

@@ -6,8 +6,8 @@ use std::collections::HashMap;
 use crate::{
     action::Action,
     akai_apc_mini_mk2_constants::AKAI_APC_MINI_MK_2_COLORS_SQUARED,
-    device::{Color, Device},
-    error::AppError,
+    device::{Color, Device, ColorStyle},
+    error::AppError, state::{PlayMode, GlobalState, Note, NOTE_COUNT},
 };
 
 // Leftovers. I need to go through to see if these are still useful.
@@ -24,6 +24,7 @@ const LIGHT_DIM: u32 = 0x01;
 // weird since it's just an offset and we need to shift the whole number.
 pub const SCENE_LAUNCH_OFFSET: u32 = 0x00000070;
 pub const TRACK_OFFSET: u32 = 0x00000064;
+pub const SHIFT_BUTTON: u32 = 0x0000007a;
 pub const NOTE_ON_STATUS: u32 = 0x20900000;
 pub const COLOR_INTENSITY: u32 = 0x20960000;
 pub const LED_10_BRIGHT: u32 = 0x00000000;
@@ -222,6 +223,47 @@ fn nearest_color(rgb: u32) -> u32 {
         .unwrap_or(0)
 }
 
+fn color_style_to_u32(style: ColorStyle) -> u32 {
+    match style {
+        ColorStyle::Steady100 => LED_100_BRIGHT,
+        ColorStyle::Steady95  => LED_95_BRIGHT,
+        ColorStyle::Steady75  => LED_75_BRIGHT,
+        ColorStyle::Steady65  => LED_65_BRIGHT,
+        ColorStyle::Steady50  => LED_50_BRIGHT,
+        ColorStyle::Steady25  => LED_25_BRIGHT,
+        ColorStyle::Steady10  => LED_10_BRIGHT,
+        ColorStyle::Pulse2    => PULSING_1_2,
+        ColorStyle::Pulse4    => PULSING_1_4,
+        ColorStyle::Pulse8    => PULSING_1_8,
+        ColorStyle::Pulse16   => PULSING_1_16,
+        ColorStyle::Blink2    => BLINKING_1_2,
+        ColorStyle::Blink4    => BLINKING_1_4,
+        ColorStyle::Blink8    => BLINKING_1_8,
+        ColorStyle::Blink16   => BLINKING_1_16,
+        ColorStyle::Blink24   => BLINKING_1_24,
+    }
+}
+
+fn set_grid_button_internal(
+    output_port: &OutputPort,
+    dest: &Destination,
+    x: usize,
+    y: usize,
+    color: Color,
+) -> Result<(), AppError> {
+    let nearest = nearest_color(color.rgb);
+    // println!("Color nearest to {:08x}: {:08x}", color.rgb, nearest);
+    let payload = NOTE_ON_STATUS
+        | color_style_to_u32(color.style)
+        | (x as u32 + (y as u32 * 8)) << 8
+        | COLORS_BY_VELOCITY.get(&nearest).unwrap_or(&0);
+    let note_on =
+        EventBuffer::new(Protocol::Midi10).with_packet(0, &[payload]);
+    output_port
+        .send(&dest, &note_on)
+        .map_err(AppError::OutputSendError)
+}
+
 impl Device for AkaiApcMiniMk2 {
     fn midi_to_action(&self, context: u32, data: u32) -> Action {
         let command = data >> 20;
@@ -238,12 +280,15 @@ impl Device for AkaiApcMiniMk2 {
                 let bottom_button = grid - TRACK_OFFSET;
                 println!("Bottom button: {}", bottom_button);
                 Action::SectionSelect { pos: bottom_button }
-            } else if grid >= SCENE_LAUNCH_OFFSET {
+            } else if grid >= SCENE_LAUNCH_OFFSET && grid < SHIFT_BUTTON {
                 let scene_launch_button = grid - SCENE_LAUNCH_OFFSET;
                 // println!("Scene launch button: {}", scene_launch_button);
                 Action::LayerSelect {
                     pos: scene_launch_button,
                 }
+            } else if grid == SHIFT_BUTTON {
+                println!("Changing play mode to playing");
+                Action::PlayModeChange(PlayMode::Playing)
             } else {
                 println!("Unsupported message {:08x}", command);
                 Action::Noop
@@ -265,17 +310,30 @@ impl Device for AkaiApcMiniMk2 {
         y: usize,
         color: Color,
     ) -> Result<(), AppError> {
-        let nearest = nearest_color(color.rgb);
-        // println!("Color nearest to {:08x}: {:08x}", color.rgb, nearest);
-        let payload = NOTE_ON_STATUS
-            | LED_100_BRIGHT
-            | (x as u32 + (y as u32 * 8)) << 8
-            | COLORS_BY_VELOCITY.get(&nearest).unwrap_or(&0);
-        let note_on =
-            EventBuffer::new(Protocol::Midi10).with_packet(0, &[payload]);
-        output_port
-            .send(&dest, &note_on)
-            .map_err(AppError::OutputSendError)
+        set_grid_button_internal(
+            &output_port,
+            &dest,
+            x,
+            y,
+            Color { rgb: color.rgb, style: ColorStyle::Steady75 },
+        )
+    }
+
+    fn set_interval(
+        &self,
+        output_port: &OutputPort,
+        dest: &Destination,
+        x: usize,
+        y: usize,
+        color: Color,
+    ) -> Result<(), AppError> {
+        set_grid_button_internal(
+            &output_port,
+            &dest,
+            x,
+            y,
+            Color { rgb: color.rgb, style: ColorStyle::Steady50 },
+        )
     }
 
     fn set_layer_button(
@@ -290,6 +348,28 @@ impl Device for AkaiApcMiniMk2 {
             | (SCENE_LAUNCH_OFFSET + layer_index as u32) << 8
             | color.rgb;
         // println!("Setting Layer button {} to color {:08x} as payload {:08x}", layer_index, color.rgb, payload);
+        let event =
+            EventBuffer::new(Protocol::Midi10).with_packet(0, &[payload]);
+        output_port
+            .send(&dest, &event)
+            .map_err(AppError::OutputSendError)
+    }
+
+    fn set_play_button(
+        &self,
+        output_port: &OutputPort,
+        dest: &Destination,
+        color: Color,
+    ) -> Result<(), AppError> {
+        // Always use NoteOn even though we turn off buttons this way.
+        let payload = NOTE_ON_STATUS
+            | SHIFT_BUTTON << 8
+            | color.rgb;
+        println!(
+            "Setting play button to color {:08x} as payload {:08x}",
+            color.rgb,
+            payload,
+        );
         let event =
             EventBuffer::new(Protocol::Midi10).with_packet(0, &[payload]);
         output_port
@@ -315,4 +395,5 @@ impl Device for AkaiApcMiniMk2 {
             .send(&dest, &event)
             .map_err(AppError::OutputSendError)
     }
+
 }

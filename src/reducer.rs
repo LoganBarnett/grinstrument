@@ -4,11 +4,6 @@ use crate::state::{GlobalState, Note};
 pub fn reducer(state: GlobalState, action: Action) -> GlobalState {
     match action {
         Action::Noop => state,
-        Action::SectionSelect { pos } => {
-            let mut new_state = state.clone();
-            new_state.player.active_section_index = pos as usize;
-            new_state
-        }
         Action::LayerSelect { pos } => {
             let mut new_state = state.clone();
             new_state.player.active_layer_index = pos as usize;
@@ -55,6 +50,16 @@ pub fn reducer(state: GlobalState, action: Action) -> GlobalState {
             let mut new_state = state.clone();
             new_state.player = state.player.clone();
             new_state.player.play_mode = play_mode;
+            new_state
+        }
+        Action::SectionSelect { pos } => {
+            let mut new_state = state.clone();
+            new_state.player.active_section_index = pos as usize;
+            new_state
+        }
+        Action::TimeInterval => {
+            let mut new_state = state.clone();
+            new_state.player.interval = state.player.interval + 1;
             new_state
         }
     }

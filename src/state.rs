@@ -1,4 +1,4 @@
-const NOTE_COUNT: usize = 8;
+pub const NOTE_COUNT: usize = 8;
 
 #[derive(Clone, Default)]
 pub enum PlayMode {
@@ -30,9 +30,10 @@ pub struct Layer {
  */
 #[derive(Clone, Default)]
 pub struct Player {
-    pub play_mode: PlayMode,
     pub active_layer_index: usize,
     pub active_section_index: usize,
+    pub interval: usize,
+    pub play_mode: PlayMode,
 }
 
 /**
@@ -70,9 +71,10 @@ pub fn initial_state() -> GlobalState {
             })
             .collect::<Vec<Section>>(),
         player: Player {
-            play_mode: PlayMode::Paused,
             active_layer_index: 0,
             active_section_index: 0,
+            interval: 0,
+            play_mode: PlayMode::Paused,
         },
     }
 }

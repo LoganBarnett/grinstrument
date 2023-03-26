@@ -6,4 +6,5 @@ pub enum Action {
     LayerSelect { pos: u32 },
     PlayModeChange(PlayMode),
     SectionSelect { pos: u32 },
+    TimeInterval,
 }
