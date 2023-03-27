@@ -9,24 +9,20 @@ mod utils;
 
 use crate::akai_apc_mini_mk2::AkaiApcMiniMk2;
 use crate::{
-    device::Color,
-    device::ColorStyle,
-    error::AppError,
-    midi::diagnose_midi_devices,
-    state::initial_state, action::Action,
+    action::Action, device::Color, device::ColorStyle, error::AppError,
+    midi::diagnose_midi_devices, state::initial_state,
 };
 use coremidi::{
-    Client, Destination, Destinations, EventList, OutputPort,
-    Protocol, Source,
+    Client, Destination, Destinations, EventList, OutputPort, Protocol, Source,
 };
 use device::Device;
 use futures::executor::block_on;
 use midi::{connect_to_controller, get_destination, get_source};
 use redux_rs::Store;
-use state::{GlobalState, Note, PlayMode};
-use std::{result::Result, time::Duration};
+use state::{GlobalState, Layer, Note, PlayMode, Section};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::{result::Result, time::Duration};
 
 include!(concat!(env!("OUT_DIR"), "/constants.rs"));
 
@@ -52,7 +48,7 @@ async fn main() -> Result<(), AppError> {
             }
         }
     });
-    let (client, mut input_port, output_port) =
+    let (_client, mut input_port, output_port) =
         connect_to_controller(callback)?;
     let dest = get_destination("APC mini mk2 Control")
         .ok_or(AppError::DestinationNotFoundError)?;
@@ -67,24 +63,22 @@ async fn main() -> Result<(), AppError> {
         .map_err(AppError::SourceListenError)?;
     if let Ok(store) = store_mutex.lock() {
         // Set the grid to be the initial state.
-        state_to_device(&device, &output_port, &dest, &initial_state());
+        state_to_device(&device, &output_port, &dest, &initial_state())?;
         println!("Subscribing...");
         store
             .subscribe(move |state: &GlobalState| {
-                state_to_device(&device, &output_port, &dest, state);
+                state_to_device(&device, &output_port, &dest, state)
+                    .unwrap_or_else(|err| {
+                        println!("Error sending state to device: {:#?}", err);
+                        ()
+                    })
             })
             .await;
     }
     println!("Setting up timer...");
-    // let timer = Timer::new();
-    // timer.schedule_repeating(
-        // chrono::Duration::milliseconds(1000),
     let _scheduler = thread::spawn(move || {
         let duration = Duration::from_millis(1000);
         loop {
-    // let mut timer = Timer::new().unwrap();
-    // timer.periodic(Duration::milliseconds(1000))
-        // move || {
             println!("Time interval: Seeing if we can grab the mutex for the store...");
             if let Ok(store) = store_mutex.lock() {
                 println!("Pumping the interval...");
@@ -98,71 +92,163 @@ async fn main() -> Result<(), AppError> {
     Ok(())
 }
 
-fn state_to_device(
+fn note_to_device(
     device: &dyn Device,
     output_port: &OutputPort,
     dest: &Destination,
-    state: &GlobalState,
-) -> () {
-    println!("State has changed...");
-    device.set_play_button(
-        &output_port,
-        &dest,
-        play_mode_color(state.player.play_mode.clone()),
-    );
-    for (section_index, section) in state.sections.iter().enumerate() {
-        device.set_section_button(
+    interval: usize,
+    section_index: usize,
+    layer_index: usize,
+    note_interval: usize,
+    note: &Note,
+) -> Result<(), AppError> {
+    (0..8)
+        .map(|note_octave| {
+            (note_interval..8)
+                .map(|note_interval_by_length| {
+                    device.set_grid_button(
+                        &output_port,
+                        &dest,
+                        note_interval,
+                        note_octave,
+                        note_color(
+                            layer_index,
+                            section_index,
+                            interval,
+                            note_interval,
+                            &note,
+                            note_octave,
+                            note_interval_by_length,
+                        ),
+                    )
+                })
+                .collect::<Result<(), AppError>>()
+        })
+        .collect::<Result<(), AppError>>()
+}
+
+fn layer_to_device(
+    device: &dyn Device,
+    output_port: &OutputPort,
+    dest: &Destination,
+    interval: usize,
+    section_index: usize,
+    active_layer_index: usize,
+    layer_index: usize,
+    layer: &Layer,
+) -> Result<(), AppError> {
+    device
+        .set_layer_button(
+            &output_port,
+            &dest,
+            layer_index,
+            Color {
+                style: ColorStyle::Steady100,
+                rgb: active_color(layer_index, active_layer_index),
+            },
+        )
+        .and_then(|()| {
+            if layer_index == active_layer_index {
+                layer
+                    .notes
+                    .iter()
+                    .enumerate()
+                    .map(|(note_index, note)| {
+                        note_to_device(
+                            device,
+                            output_port,
+                            dest,
+                            interval,
+                            section_index,
+                            layer_index,
+                            note_index,
+                            &note,
+                        )
+                    })
+                    .collect::<Result<(), AppError>>()
+            } else {
+                Ok(())
+            }
+        })
+}
+
+fn section_to_device(
+    device: &dyn Device,
+    output_port: &OutputPort,
+    dest: &Destination,
+    interval: usize,
+    active_section_index: usize,
+    active_layer_index: usize,
+    section_index: usize,
+    section: &Section,
+) -> Result<(), AppError> {
+    device
+        .set_section_button(
             &output_port,
             &dest,
             section_index,
             Color {
                 style: ColorStyle::Steady100,
-                rgb: active_color(
-                    section_index,
-                    state.player.active_section_index,
-                ),
+                rgb: active_color(section_index, active_section_index),
             },
-        );
-        if section_index == state.player.active_section_index {
-            for (layer_index, layer) in section.layers.iter().enumerate() {
-                device.set_layer_button(
-                    &output_port,
-                    &dest,
-                    layer_index,
-                    Color {
-                        style: ColorStyle::Steady100,
-                        rgb: active_color(
+        )
+        .and_then(|()| {
+            if section_index == active_section_index {
+                section
+                    .layers
+                    .iter()
+                    .enumerate()
+                    .map(|(layer_index, layer)| {
+                        layer_to_device(
+                            device,
+                            output_port,
+                            dest,
+                            interval,
+                            section_index,
+                            active_layer_index,
                             layer_index,
-                            state.player.active_layer_index,
-                        ),
-                    },
-                );
-                if layer_index == state.player.active_layer_index {
-                    for (note_index, note) in layer.notes.iter().enumerate() {
-                        for j in 0..8 {
-                            for k in j..8 {
-                                device.set_grid_button(
-                                    &output_port,
-                                    &dest,
-                                    note_index,
-                                    j,
-                                    note_color(
-                                        layer_index,
-                                        section_index,
-                                        state.player.interval,
-                                        note_index,
-                                        &note,
-                                        j,
-                                        k,
-                                    ),
-                                );
-                            }
-                        }
-                    }
-                }
+                            &layer,
+                        )
+                    })
+                    .collect::<Result<(), AppError>>()
+            } else {
+                Ok(())
             }
-        }
-    }
+        })
+}
+
+fn state_to_device(
+    device: &dyn Device,
+    output_port: &OutputPort,
+    dest: &Destination,
+    state: &GlobalState,
+) -> Result<(), AppError> {
+    println!("State has changed...");
+    device
+        .set_play_button(
+            &output_port,
+            &dest,
+            play_mode_color(state.player.play_mode.clone()),
+        )
+        .and_then(|()| {
+            state
+                .sections
+                .iter()
+                .enumerate()
+                .map(|(section_index, section)| {
+                    section_to_device(
+                        device,
+                        output_port,
+                        dest,
+                        state.player.interval,
+                        state.player.active_section_index,
+                        state.player.active_layer_index,
+                        section_index,
+                        section,
+                    )
+                })
+                .collect::<Result<(), AppError>>()
+        })
 }
 
 // Order dictates the layer.
@@ -194,31 +280,55 @@ fn note_color(
     if interval == note_index + (section * 8) {
         // Active note and interval.
         if note.length > 0 && note.octaves.contains(&octave) {
-            Color { rgb: LAYER_COLORS[layer], style: ColorStyle::Steady95 }
+            Color {
+                rgb: LAYER_COLORS[layer],
+                style: ColorStyle::Steady95,
+            }
             // Interval active here.
         } else {
-            Color { rgb: LAYER_COLORS[layer], style: ColorStyle::Steady50 }
+            Color {
+                rgb: LAYER_COLORS[layer],
+                style: ColorStyle::Steady50,
+            }
         }
         // Active note with nothing else.
     } else if note.length > 0 && note.octaves.contains(&octave) {
         if length_pos == 0 {
             // Where the note begins.
-            Color { rgb: LAYER_COLORS[layer], style: ColorStyle::Steady75 }
+            Color {
+                rgb: LAYER_COLORS[layer],
+                style: ColorStyle::Steady75,
+            }
         } else {
             // Any part of a longer note.
-            Color { rgb: LAYER_COLORS[layer], style: ColorStyle::Steady65 }
+            Color {
+                rgb: LAYER_COLORS[layer],
+                style: ColorStyle::Steady65,
+            }
         }
         // Vacant.
     } else {
-        Color { rgb: 0, style: ColorStyle::Steady100 }
+        Color {
+            rgb: 0,
+            style: ColorStyle::Steady100,
+        }
     }
 }
 
 fn play_mode_color(play_mode: PlayMode) -> Color {
     match play_mode {
-        PlayMode::Playing => Color { rgb: 0x1, style: ColorStyle::Steady100 },
-        PlayMode::Paused => Color { rgb: 0x1, style: ColorStyle::Blink2 },
-        PlayMode::Stopped => Color { rgb: 0x0, style: ColorStyle::Steady100 },
+        PlayMode::Playing => Color {
+            rgb: 0x1,
+            style: ColorStyle::Steady100,
+        },
+        PlayMode::Paused => Color {
+            rgb: 0x1,
+            style: ColorStyle::Blink2,
+        },
+        PlayMode::Stopped => Color {
+            rgb: 0x0,
+            style: ColorStyle::Steady100,
+        },
     }
 }
 

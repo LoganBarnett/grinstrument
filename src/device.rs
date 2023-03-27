@@ -70,5 +70,4 @@ pub trait Device {
         section_index: usize,
         color: Color,
     ) -> Result<(), AppError>;
-
 }

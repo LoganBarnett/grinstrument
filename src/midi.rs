@@ -41,7 +41,7 @@ pub fn connect_to_controller<
     match endpoint_names!(Sources)
         .find(|(_, name)| name == PREFERRED_CONTROLLER_NAME)
     {
-        Some(name) => {
+        Some(_name) => {
             let client = Client::new("grinstrument-client")
                 .map_err(AppError::MidiClientError)?;
             let output_port = client

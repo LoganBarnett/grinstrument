@@ -6,19 +6,20 @@ use std::collections::HashMap;
 use crate::{
     action::Action,
     akai_apc_mini_mk2_constants::AKAI_APC_MINI_MK_2_COLORS_SQUARED,
-    device::{Color, Device, ColorStyle},
-    error::AppError, state::{PlayMode, GlobalState, Note, NOTE_COUNT},
+    device::{Color, ColorStyle, Device},
+    error::AppError,
+    state::PlayMode,
 };
 
 // Leftovers. I need to go through to see if these are still useful.
-const GRID_OFFSET: u32 = 56;
-const GRID_GREEN: u32 = 1;
-const NOTE_ON: u32 = 0x2090407f;
-const NOTE_OFF: u32 = 0x2080407f;
-const NOTE_ON_C: u32 = 0x40903c00;
-const MASK_HALF: u32 = 0xffff0000;
-const MASK: u32 = 0xffff0000;
-const LIGHT_DIM: u32 = 0x01;
+const _GRID_OFFSET: u32 = 56;
+const _GRID_GREEN: u32 = 1;
+const _NOTE_ON: u32 = 0x2090407f;
+const _NOTE_OFF: u32 = 0x2080407f;
+const _NOTE_ON_C: u32 = 0x40903c00;
+const _MASK_HALF: u32 = 0xffff0000;
+const _MASK: u32 = 0xffff0000;
+const _LIGHT_DIM: u32 = 0x01;
 
 // Weird because scene launch offset should be 0x7000 but it makes the math
 // weird since it's just an offset and we need to shift the whole number.
@@ -26,7 +27,7 @@ pub const SCENE_LAUNCH_OFFSET: u32 = 0x00000070;
 pub const TRACK_OFFSET: u32 = 0x00000064;
 pub const SHIFT_BUTTON: u32 = 0x0000007a;
 pub const NOTE_ON_STATUS: u32 = 0x20900000;
-pub const COLOR_INTENSITY: u32 = 0x20960000;
+pub const _COLOR_INTENSITY: u32 = 0x20960000;
 pub const LED_10_BRIGHT: u32 = 0x00000000;
 pub const LED_25_BRIGHT: u32 = 0x00010000;
 pub const LED_50_BRIGHT: u32 = 0x00020000;
@@ -44,7 +45,7 @@ pub const BLINKING_1_8: u32 = 0x000d0000;
 pub const BLINKING_1_4: u32 = 0x000e0000;
 pub const BLINKING_1_2: u32 = 0x000f0000;
 pub const NOTE_OFF_STATUS: u32 = 0x20800000;
-pub const BAR_BLINK: u32 = 2;
+pub const _BAR_BLINK: u32 = 2;
 pub const GRID_MASK: u32 = 0x0000ff00;
 
 lazy_static! {
@@ -191,7 +192,7 @@ fn color_square(rgb: u32) -> (u32, u32, u32) {
     (r.pow(2), g.pow(2), b.pow(2))
 }
 
-fn color_square_tuple(rgb: u32) -> (u32, (u32, u32, u32)) {
+fn _color_square_tuple(rgb: u32) -> (u32, (u32, u32, u32)) {
     (rgb, color_square(rgb))
 }
 
@@ -226,21 +227,21 @@ fn nearest_color(rgb: u32) -> u32 {
 fn color_style_to_u32(style: ColorStyle) -> u32 {
     match style {
         ColorStyle::Steady100 => LED_100_BRIGHT,
-        ColorStyle::Steady95  => LED_95_BRIGHT,
-        ColorStyle::Steady75  => LED_75_BRIGHT,
-        ColorStyle::Steady65  => LED_65_BRIGHT,
-        ColorStyle::Steady50  => LED_50_BRIGHT,
-        ColorStyle::Steady25  => LED_25_BRIGHT,
-        ColorStyle::Steady10  => LED_10_BRIGHT,
-        ColorStyle::Pulse2    => PULSING_1_2,
-        ColorStyle::Pulse4    => PULSING_1_4,
-        ColorStyle::Pulse8    => PULSING_1_8,
-        ColorStyle::Pulse16   => PULSING_1_16,
-        ColorStyle::Blink2    => BLINKING_1_2,
-        ColorStyle::Blink4    => BLINKING_1_4,
-        ColorStyle::Blink8    => BLINKING_1_8,
-        ColorStyle::Blink16   => BLINKING_1_16,
-        ColorStyle::Blink24   => BLINKING_1_24,
+        ColorStyle::Steady95 => LED_95_BRIGHT,
+        ColorStyle::Steady75 => LED_75_BRIGHT,
+        ColorStyle::Steady65 => LED_65_BRIGHT,
+        ColorStyle::Steady50 => LED_50_BRIGHT,
+        ColorStyle::Steady25 => LED_25_BRIGHT,
+        ColorStyle::Steady10 => LED_10_BRIGHT,
+        ColorStyle::Pulse2 => PULSING_1_2,
+        ColorStyle::Pulse4 => PULSING_1_4,
+        ColorStyle::Pulse8 => PULSING_1_8,
+        ColorStyle::Pulse16 => PULSING_1_16,
+        ColorStyle::Blink2 => BLINKING_1_2,
+        ColorStyle::Blink4 => BLINKING_1_4,
+        ColorStyle::Blink8 => BLINKING_1_8,
+        ColorStyle::Blink16 => BLINKING_1_16,
+        ColorStyle::Blink24 => BLINKING_1_24,
     }
 }
 
@@ -257,15 +258,14 @@ fn set_grid_button_internal(
         | color_style_to_u32(color.style)
         | (x as u32 + (y as u32 * 8)) << 8
         | COLORS_BY_VELOCITY.get(&nearest).unwrap_or(&0);
-    let note_on =
-        EventBuffer::new(Protocol::Midi10).with_packet(0, &[payload]);
+    let note_on = EventBuffer::new(Protocol::Midi10).with_packet(0, &[payload]);
     output_port
         .send(&dest, &note_on)
         .map_err(AppError::OutputSendError)
 }
 
 impl Device for AkaiApcMiniMk2 {
-    fn midi_to_action(&self, context: u32, data: u32) -> Action {
+    fn midi_to_action(&self, _context: u32, data: u32) -> Action {
         let command = data >> 20;
         if command == (NOTE_ON_STATUS >> 20) {
             println!("Note on {:08x}", command);
@@ -315,7 +315,10 @@ impl Device for AkaiApcMiniMk2 {
             &dest,
             x,
             y,
-            Color { rgb: color.rgb, style: ColorStyle::Steady75 },
+            Color {
+                rgb: color.rgb,
+                style: ColorStyle::Steady75,
+            },
         )
     }
 
@@ -332,7 +335,10 @@ impl Device for AkaiApcMiniMk2 {
             &dest,
             x,
             y,
-            Color { rgb: color.rgb, style: ColorStyle::Steady50 },
+            Color {
+                rgb: color.rgb,
+                style: ColorStyle::Steady50,
+            },
         )
     }
 
@@ -362,13 +368,10 @@ impl Device for AkaiApcMiniMk2 {
         color: Color,
     ) -> Result<(), AppError> {
         // Always use NoteOn even though we turn off buttons this way.
-        let payload = NOTE_ON_STATUS
-            | SHIFT_BUTTON << 8
-            | color.rgb;
+        let payload = NOTE_ON_STATUS | SHIFT_BUTTON << 8 | color.rgb;
         println!(
             "Setting play button to color {:08x} as payload {:08x}",
-            color.rgb,
-            payload,
+            color.rgb, payload,
         );
         let event =
             EventBuffer::new(Protocol::Midi10).with_packet(0, &[payload]);
@@ -395,5 +398,4 @@ impl Device for AkaiApcMiniMk2 {
             .send(&dest, &event)
             .map_err(AppError::OutputSendError)
     }
-
 }
